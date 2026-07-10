@@ -3,6 +3,15 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0]
+
+### Changed
+- Pinned page-pilot version bumped to 0.11.0, which adds
+  `waitFor(target, { state: 'gone' })` — fixes a real race condition on
+  pages that update content asynchronously without a full navigation,
+  where replaying a step right after one that triggers such an update
+  could run ahead of it and hit a stale element.
+
 ## [0.2.0]
 
 ### Changed

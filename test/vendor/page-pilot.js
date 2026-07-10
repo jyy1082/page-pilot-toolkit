@@ -1100,23 +1100,35 @@ export class PagePilot {
   }
 
   /**
-   * Wait for a selector to match a visible element (or for a predicate
-   * function to return a truthy element) before continuing — for content
-   * that loads or renders asynchronously, instead of guessing a fixed delay.
-   * Resolves with the found element. Rejects with a plain Error on timeout,
-   * or with PagePilotStopped if stop() is called while waiting.
+   * Wait for a selector (or predicate function) to match a visible element
+   * before continuing — for content that loads or updates asynchronously,
+   * instead of guessing a fixed delay. Resolves with the found element.
    *
-   * target: a selector string, or a function returning an element (or null)
+   * options.state: 'visible' (default) waits for a match to appear;
+   *   'gone' waits for a match to NOT be present (or to become invisible)
+   *   — useful right before an action that depends on some earlier,
+   *   about-to-be-replaced element having actually been removed first (a
+   *   common source of "clicked the stale/old version of a button" bugs
+   *   when a page updates its content asynchronously without a full
+   *   navigation, and the next step runs before that update lands).
+   *
+   * Rejects with a plain Error on timeout, or with PagePilotStopped if
+   * stop() is called while waiting.
+   *
+   * target: a selector string, a function returning an element (or null),
+   *   or { selector, frame } for a same-origin iframe.
    * options.timeout: ms before giving up (default 5000)
    * options.interval: ms between checks (default 100)
    * options.visible: also require a non-zero bounding rect (default true) —
    *   set false to accept elements that exist but are currently hidden
+   *   (only applies when options.state is 'visible')
    */
   waitFor(target, options = {}) {
     return this._enqueue(async () => {
       const timeout = options.timeout ?? 5000;
       const interval = options.interval ?? 100;
       const requireVisible = options.visible !== false;
+      const waitForGone = options.state === 'gone';
       const step = { type: 'waitFor', target, label: options.label };
       this.opts.onBeforeStep?.(step);
 
@@ -1142,15 +1154,27 @@ export class PagePilot {
             const r = el.getBoundingClientRect();
             return r.width > 0 || r.height > 0;
           })());
-          if (el && visible) {
+
+          if (waitForGone) {
+            // Success once the element is either gone from the DOM entirely,
+            // or present but no longer visible (covers both "removed" and
+            // "hidden via display:none/etc." as valid ways to be "gone").
+            if (!el || !visible) {
+              this._pendingRejects.delete(abort);
+              resolve(null);
+              return;
+            }
+          } else if (el && visible) {
             this._pendingRejects.delete(abort);
             resolve(el);
             return;
           }
+
           if (performance.now() - start > timeout) {
             this._pendingRejects.delete(abort);
             const desc = typeof querySelector === 'string' ? `"${querySelector}"` : 'the given condition';
-            reject(new Error(`PagePilot: waitFor timed out after ${timeout}ms waiting for ${desc}`));
+            const verb = waitForGone ? 'disappear' : 'appear';
+            reject(new Error(`PagePilot: waitFor timed out after ${timeout}ms waiting for ${desc} to ${verb}`));
             return;
           }
           timer = setTimeout(tick, interval);
