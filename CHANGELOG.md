@@ -3,6 +3,15 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.1]
+
+### Changed
+- Pinned page-pilot version bumped to 0.12.1, which fixes `waitFor()`
+  incorrectly polling a stale document if an iframe navigates or reloads
+  its own content while waiting (e.g. an embedded payment widget or
+  multi-step form that reloads just that iframe, without the top page
+  navigating at all).
+
 ## [0.4.0]
 
 ### Changed

@@ -1164,7 +1164,6 @@ export class PagePilot {
       // Support target as a function, a plain selector string, or
       // { selector, frame } for polling inside a same-origin iframe.
       const isFrameTarget = target && typeof target === 'object' && 'selector' in target;
-      const queryDoc = isFrameTarget ? this._resolveFrameDocument(target.frame) : document;
       const querySelector = isFrameTarget ? target.selector : target;
 
       const start = performance.now();
@@ -1175,9 +1174,22 @@ export class PagePilot {
         const tick = () => {
           let el = null;
           try {
-            el = typeof target === 'function' ? target() : queryDoc.querySelector(querySelector);
+            if (typeof target === 'function') {
+              el = target();
+            } else {
+              // Re-resolve the frame document on every tick, not once up
+              // front — if the iframe itself navigates/reloads while we're
+              // waiting (e.g. a button click that reloads just that
+              // iframe's own content, without the top page navigating at
+              // all), its contentDocument gets replaced with a brand-new
+              // Document object. Caching the old one here would mean
+              // polling a stale, torn-down document forever and timing out
+              // even once the real new content is ready.
+              const doc = isFrameTarget ? this._resolveFrameDocument(target.frame) : document;
+              el = doc.querySelector(querySelector);
+            }
           } catch {
-            el = null;
+            el = null; // e.g. the iframe is mid-navigation right now — try again next tick
           }
           const visible = !requireVisible || (el && (() => {
             const r = el.getBoundingClientRect();
