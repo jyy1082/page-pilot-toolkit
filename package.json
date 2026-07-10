@@ -1,0 +1,22 @@
+{
+  "name": "page-pilot-toolkit",
+  "version": "0.1.0",
+  "description": "A bookmarklet that drops a record/run panel onto any webpage, built on page-pilot (playback) and page-pilot-recorder (recording). No install, no extension — drag a bookmark, click it anywhere.",
+  "private": true,
+  "scripts": {
+    "test": "node test/browser-test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.40.0",
+    "@sparticuz/chromium": "^149.0.0"
+  },
+  "keywords": [
+    "browser-automation",
+    "bookmarklet",
+    "page-pilot"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  }
+}

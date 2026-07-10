@@ -1,0 +1,39 @@
+# Changelog
+
+All notable changes to this project are documented in this file, following
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [0.1.0] — Initial release
+
+### Added
+- `toolkit.js`: loaded by a bookmarklet, dynamically imports pinned versions
+  of page-pilot and page-pilot-recorder from jsDelivr, and renders a
+  floating record/run panel inside a closed-off Shadow DOM so it can't be
+  visually broken by (or leak styles onto) whatever site it's running on.
+- Panel controls: Start/Stop recording, an editable JSON textarea showing
+  the recorded steps, Run (plays them back with `showPageGlow` +
+  `pageGlowMessage` for visible feedback), and Copy (to clipboard).
+- Running a hand-written steps array works the same way as running a
+  recorded one — pasting into the box and pressing Run doesn't require
+  recording first.
+- `install.html`: the page with the actual draggable bookmarklet link and
+  usage/security notes.
+- A real-browser test suite (`test/browser-test.mjs`, `npm test`) covering
+  the full record → stop → run round trip through the panel UI, pasting
+  and running hand-written steps, password-field exclusion end-to-end,
+  Copy-to-clipboard, and closing/reopening the panel.
+
+### Fixed (found via the real-browser tests before shipping)
+- Re-"clicking" the bookmarklet after closing the panel did nothing: an ES
+  module script is only ever evaluated once per exact URL, so injecting a
+  second `<script type="module">` pointing at the identical jsDelivr URL
+  silently no-ops instead of re-running `toolkit.js`'s top-level code.
+  Fixed by appending a `?t=<timestamp>` cache-buster to the script URL each
+  time the bookmarklet runs, forcing a fresh module evaluation.
+- Clicks inside the Shadow DOM panel get retargeted when observed by a
+  listener outside the shadow root (`event.target` appears as the shadow
+  host element, not the actual button clicked inside it) — this meant the
+  recorder's own `data-ppr-ignore` exclusion check couldn't find the marker
+  by walking up from the real target. Fixed by also putting
+  `data-ppr-ignore` directly on the shadow host element itself, which is
+  what a retargeted event's `target` actually resolves to.
