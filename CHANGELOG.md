@@ -3,6 +3,14 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0]
+
+### Changed
+- Pinned versions bumped to page-pilot 0.12.0 and page-pilot-recorder 0.5.0,
+  which add text-based matching for buttons/links (`{ selector, text }`
+  targets) — often the most human-recognizable and redesign-resistant way
+  to identify a button that has no id/aria-label/data attribute at all.
+
 ## [0.3.0]
 
 ### Changed

@@ -183,6 +183,38 @@ export function generateSelector(el) {
     if (isUnique(root, sel)) return { selector: sel, fragile: false };
   }
 
+  // For buttons/links (or role="button"), the visible text is often the
+  // most stable, human-recognizable identifier — far more resilient to a
+  // redesign than a CSS class, and frequently present even when there's no
+  // id/aria-label/data attribute at all. Only tried for reasonably short,
+  // static text (long paragraphs or highly dynamic content make poor
+  // identifiers). Native CSS has no "match by text" selector, so this
+  // produces a { selector, text } target instead of a plain string — see
+  // page-pilot's _resolve() for how it's matched.
+  const isButtonLike = el.tagName === 'BUTTON' || el.tagName === 'A' || el.getAttribute('role') === 'button';
+  if (isButtonLike) {
+    const text = (el.textContent || '').trim();
+    if (text && text.length <= 60) {
+      const tagSel = el.tagName.toLowerCase();
+      let matches;
+      try {
+        matches = Array.from(root.querySelectorAll(tagSel)).filter((e) => (e.textContent || '').trim() === text);
+      } catch {
+        matches = [];
+      }
+      if (matches.length === 1) {
+        return { selector: tagSel, text, fragile: false };
+      }
+      if (matches.length > 1) {
+        // Several elements share the exact same text (e.g. a "Delete" button
+        // repeated in every row of a list) — disambiguate by position, same
+        // approach as duplicate ids.
+        const index = matches.indexOf(el);
+        if (index !== -1) return { selector: tagSel, text, index, fragile: true };
+      }
+    }
+  }
+
   const stableClasses = Array.from(el.classList || []).filter(isStableClass);
   if (stableClasses.length) {
     const sel = `${el.tagName.toLowerCase()}.${stableClasses.map(cssEscape).join('.')}`;
@@ -388,8 +420,9 @@ export class PagePilotRecorder {
    */
   _buildTarget(el, generated) {
     const frame = this._frameFor(el);
-    if (generated.index === undefined && !frame) return generated.selector;
+    if (generated.index === undefined && generated.text === undefined && !frame) return generated.selector;
     const target = { selector: generated.selector };
+    if (generated.text !== undefined) target.text = generated.text;
     if (generated.index !== undefined) target.index = generated.index;
     if (frame) target.frame = frame;
     return target;

@@ -731,19 +731,48 @@ export class PagePilot {
     return this.queue;
   }
 
-  /** Resolve a target that may be an Element, a selector string, or {x, y}. */
   /** Resolve a target that may be an Element, a selector string, or
-   * { selector, frame } for an element inside a same-origin iframe, or
+   * { selector, frame } for an element inside a same-origin iframe,
    * { selector, index } to pick the Nth match of a selector that matches
-   * more than one element — page-pilot-recorder produces this for elements
-   * sharing a duplicate `id` (invalid HTML, but common on real sites),
-   * where the plain #id selector alone can't tell them apart. `frame` is an
-   * iframe selector (or an array of them, for nested iframes) — see
-   * _resolveFrameDocument. */
+   * more than one element (page-pilot-recorder produces this for elements
+   * sharing a duplicate `id` — invalid HTML, but common on real sites,
+   * where the plain #id selector alone can't tell them apart), or
+   * { selector, text } / { selector, text, index } to match a button/link
+   * by its visible text content (native CSS has no "match by text"
+   * selector, so page-pilot-recorder produces this shape for buttons/links
+   * identified by their text instead of an id/attribute). All of these
+   * combine freely with `frame`. `frame` is an iframe selector (or an
+   * array of them, for nested iframes) — see _resolveFrameDocument. */
   _resolve(target) {
     if (target && typeof target === 'object' && 'selector' in target) {
       const doc = this._resolveFrameDocument(target.frame);
       const where = target.frame ? ` inside frame "${JSON.stringify(target.frame)}"` : '';
+
+      // { selector, text } / { selector, text, index }: native CSS has no
+      // "match by text content" selector, so text-based targets (generated
+      // by page-pilot-recorder for buttons/links identified by their
+      // visible text) work by querying the plain tag/attribute selector
+      // first, then filtering to elements whose trimmed textContent equals
+      // `text`, then optionally picking the Nth of those.
+      if (target.text !== undefined) {
+        let all;
+        try {
+          all = Array.from(doc.querySelectorAll(target.selector));
+        } catch {
+          throw new Error(`PagePilot: invalid selector "${target.selector}"${where}`);
+        }
+        const matches = all.filter((el) => (el.textContent || '').trim() === target.text);
+        const el = target.index !== undefined ? matches[target.index] : matches[0];
+        if (!el) {
+          const idxPart = target.index !== undefined ? ` at index ${target.index}` : '';
+          throw new Error(
+            `PagePilot: no "${target.selector}" element${idxPart} with text "${target.text}"${where} ` +
+            `(found ${matches.length} match(es) with that text)`
+          );
+        }
+        return el;
+      }
+
       if (target.index !== undefined) {
         const matches = doc.querySelectorAll(target.selector);
         const el = matches[target.index];
