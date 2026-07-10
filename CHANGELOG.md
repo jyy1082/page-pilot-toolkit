@@ -3,6 +3,20 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0]
+
+### Changed
+- Pinned versions bumped to page-pilot 0.10.0 and page-pilot-recorder 0.4.0,
+  which add duplicate-`id` disambiguation (`{ selector, index }` targets) —
+  real, especially older or messier, sites often have more than one element
+  sharing the same `id`, and recorded steps for such elements now resolve
+  correctly on replay instead of always hitting the first match.
+- Also fixes the earlier tag/version-pinning setup: the very first release
+  referenced version tags on page-pilot/page-pilot-recorder that hadn't
+  actually been created as real git tags yet, so jsDelivr's `@version`
+  URLs 404'd and the bookmarklet silently did nothing. All three repos now
+  have proper tags matching every pinned version referenced anywhere.
+
 ## [0.1.0] — Initial release
 
 ### Added

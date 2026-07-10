@@ -733,17 +733,30 @@ export class PagePilot {
 
   /** Resolve a target that may be an Element, a selector string, or {x, y}. */
   /** Resolve a target that may be an Element, a selector string, or
-   * { selector, frame } for an element inside a same-origin iframe. `frame`
-   * is an iframe selector (or an array of them, for nested iframes) — see
+   * { selector, frame } for an element inside a same-origin iframe, or
+   * { selector, index } to pick the Nth match of a selector that matches
+   * more than one element — page-pilot-recorder produces this for elements
+   * sharing a duplicate `id` (invalid HTML, but common on real sites),
+   * where the plain #id selector alone can't tell them apart. `frame` is an
+   * iframe selector (or an array of them, for nested iframes) — see
    * _resolveFrameDocument. */
   _resolve(target) {
     if (target && typeof target === 'object' && 'selector' in target) {
       const doc = this._resolveFrameDocument(target.frame);
-      const el = doc.querySelector(target.selector);
-      if (!el) {
-        const where = target.frame ? ` inside frame "${JSON.stringify(target.frame)}"` : '';
-        throw new Error(`PagePilot: no element matches "${target.selector}"${where}`);
+      const where = target.frame ? ` inside frame "${JSON.stringify(target.frame)}"` : '';
+      if (target.index !== undefined) {
+        const matches = doc.querySelectorAll(target.selector);
+        const el = matches[target.index];
+        if (!el) {
+          throw new Error(
+            `PagePilot: no element at index ${target.index} matching "${target.selector}"${where} ` +
+            `(found ${matches.length} match(es))`
+          );
+        }
+        return el;
       }
+      const el = doc.querySelector(target.selector);
+      if (!el) throw new Error(`PagePilot: no element matches "${target.selector}"${where}`);
       return el;
     }
     if (typeof target === 'string') {
@@ -1173,7 +1186,12 @@ export class PagePilot {
     // { selector, frame } so _resolve() looks in the right document. Only
     // strings get wrapped — an already-resolved Element or a raw {x,y}
     // point (dragTo's destination) pass through untouched.
-    const withFrame = (val, frame) => (frame && typeof val === 'string') ? { selector: val, frame } : val;
+    const withFrame = (val, frame) => {
+      if (!frame) return val;
+      if (typeof val === 'string') return { selector: val, frame };
+      if (val && typeof val === 'object' && 'selector' in val && !('frame' in val)) return { ...val, frame };
+      return val; // already has its own frame, or is an Element/raw {x,y} point — leave as-is
+    };
     try {
       for (const s of steps) {
         if (s.type === 'click') await this.click(withFrame(s.target, s.frame), s.label);

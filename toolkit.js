@@ -13,8 +13,8 @@
  * install.html's bookmarklet URL together when you want to ship an update.
  */
 
-const PAGE_PILOT_URL = 'https://cdn.jsdelivr.net/gh/jyy1082/page-pilot@0.9.0/page-pilot.js';
-const RECORDER_URL = 'https://cdn.jsdelivr.net/gh/jyy1082/page-pilot-recorder@0.3.2/page-pilot-recorder.js';
+const PAGE_PILOT_URL = 'https://cdn.jsdelivr.net/gh/jyy1082/page-pilot@0.10.0/page-pilot.js';
+const RECORDER_URL = 'https://cdn.jsdelivr.net/gh/jyy1082/page-pilot-recorder@0.4.0/page-pilot-recorder.js';
 
 if (window.__pagePilotToolkitActive) {
   // Already running on this page (clicked the bookmarklet twice) — no-op

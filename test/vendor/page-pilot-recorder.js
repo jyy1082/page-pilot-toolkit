@@ -130,6 +130,27 @@ export function generateSelector(el) {
   if (el.id) {
     const sel = `#${cssEscape(el.id)}`;
     if (isUnique(root, sel)) return { selector: sel, fragile: false };
+
+    // Duplicate ids are surprisingly common on real (especially older or
+    // messier) sites — invalid HTML, but browsers don't stop you from doing
+    // it. Rather than throwing the id away entirely and falling all the way
+    // back to a deep structural path, disambiguate among just the elements
+    // sharing this id by position: much shorter and more robust than a full
+    // ancestor-based path, since it still anchors on the (weak) id signal.
+    // This produces a { selector, index } target instead of a plain string —
+    // still marked fragile, since a duplicate id is itself a sign of markup
+    // that could shift under you.
+    const dupSelector = `[id="${escapeAttrValue(el.id)}"]`;
+    let duplicates;
+    try {
+      duplicates = Array.from(root.querySelectorAll(dupSelector));
+    } catch {
+      duplicates = [];
+    }
+    const index = duplicates.indexOf(el);
+    if (index !== -1 && duplicates.length > 1) {
+      return { selector: dupSelector, index, fragile: true };
+    }
   }
 
   for (const attr of ['data-testid', 'data-cy', 'data-test', 'data-qa']) {
@@ -358,6 +379,22 @@ export class PagePilotRecorder {
     return path.length === 1 ? path[0] : path;
   }
 
+  /**
+   * Build the target value for a step from an element and its generated
+   * selector: a plain selector string when that's enough on its own, or
+   * { selector, index?, frame? } when the element needed positional
+   * disambiguation (duplicate ids) and/or lives inside a same-origin
+   * iframe. page-pilot's _resolve() understands both shapes.
+   */
+  _buildTarget(el, generated) {
+    const frame = this._frameFor(el);
+    if (generated.index === undefined && !frame) return generated.selector;
+    const target = { selector: generated.selector };
+    if (generated.index !== undefined) target.index = generated.index;
+    if (frame) target.frame = frame;
+    return target;
+  }
+
   /** Clear everything recorded so far without stopping. */
   clear() {
     this.steps = [];
@@ -522,17 +559,15 @@ export class PagePilotRecorder {
       return;
     }
 
-    const { selector, fragile } = generateSelector(el);
-    const step = { type: 'click', target: selector };
-    if (fragile) step.fragile = true;
-    const frame = this._frameFor(el);
-    if (frame) step.frame = frame;
+    const generated = generateSelector(el);
+    const step = { type: 'click', target: this._buildTarget(el, generated) };
+    if (generated.fragile) step.fragile = true;
     this._pushStep(step);
 
     // Remember this click as a possible chooseOption trigger — if the very
     // next recorded step turns out to be a click on something that appeared
     // shortly after this one, the two get merged (see _tryMergeChooseOption).
-    this._pendingTrigger = { el, selector, fragile, frame, time: now, step };
+    this._pendingTrigger = { el, generated, time: now, step };
   }
 
   /**
@@ -551,16 +586,15 @@ export class PagePilotRecorder {
     if (pending.el === el || pending.el.contains(el)) return false;
     if (!this._wasRevealedSince(el, pending.time, now)) return false;
 
-    const { selector: optionSelector, fragile: optionFragile } = generateSelector(el);
+    const optionGenerated = generateSelector(el);
     const mergedStep = {
       type: 'chooseOption',
-      target: pending.selector,
-      option: optionSelector,
+      target: this._buildTarget(pending.el, pending.generated),
+      option: this._buildTarget(el, optionGenerated),
     };
     const waitAfterOpen = Math.round((now - pending.time) / 50) * 50;
     if (waitAfterOpen > 0) mergedStep.options = { waitAfterOpen };
-    if (pending.fragile || optionFragile) mergedStep.fragile = true;
-    if (pending.frame) mergedStep.frame = pending.frame;
+    if (pending.generated.fragile || optionGenerated.fragile) mergedStep.fragile = true;
     if (pending.step.gapBefore) mergedStep.gapBefore = pending.step.gapBefore;
 
     const idx = this.steps.indexOf(pending.step);
@@ -581,24 +615,20 @@ export class PagePilotRecorder {
     this._flushIfBlurred();
 
     if (el.tagName === 'SELECT') {
-      const { selector, fragile } = generateSelector(el);
+      const generated = generateSelector(el);
       const value = el.multiple
         ? Array.from(el.selectedOptions).map((o) => o.value)
         : el.value;
-      const step = { type: 'select', target: selector, value };
-      if (fragile) step.fragile = true;
-      const frame = this._frameFor(el);
-      if (frame) step.frame = frame;
+      const step = { type: 'select', target: this._buildTarget(el, generated), value };
+      if (generated.fragile) step.fragile = true;
       this._pushStep(step);
       return;
     }
 
     if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio')) {
-      const { selector, fragile } = generateSelector(el);
-      const step = { type: 'check', target: selector, checked: el.checked };
-      if (fragile) step.fragile = true;
-      const frame = this._frameFor(el);
-      if (frame) step.frame = frame;
+      const generated = generateSelector(el);
+      const step = { type: 'check', target: this._buildTarget(el, generated), checked: el.checked };
+      if (generated.fragile) step.fragile = true;
       this._pushStep(step);
     }
   }
@@ -614,11 +644,10 @@ export class PagePilotRecorder {
   /** Establish a fresh typing buffer for a form field, flushing any prior one first. */
   _beginTypingBuffer(el) {
     this._flushTyping();
-    const { selector, fragile } = generateSelector(el);
+    const generated = generateSelector(el);
     this._typingBuffer = {
       el,
-      selector,
-      fragile,
+      generated,
       startValue: el.isContentEditable ? el.textContent : el.value,
     };
   }
@@ -634,10 +663,8 @@ export class PagePilotRecorder {
     if (!buf) return;
     const currentValue = buf.el.isContentEditable ? buf.el.textContent : buf.el.value;
     if (currentValue === buf.startValue || currentValue === '') return; // nothing typed, skip
-    const step = { type: 'type', target: buf.selector, text: currentValue };
-    if (buf.fragile) step.fragile = true;
-    const frame = this._frameFor(buf.el);
-    if (frame) step.frame = frame;
+    const step = { type: 'type', target: this._buildTarget(buf.el, buf.generated), text: currentValue };
+    if (buf.generated.fragile) step.fragile = true;
     this._pushStep(step);
   }
 
@@ -671,16 +698,15 @@ export class PagePilotRecorder {
 
     let target = null;
     let fragile = false;
-    let frame;
     if (el && el.nodeType === 1 && el !== (el.ownerDocument || document).body) {
-      ({ selector: target, fragile } = generateSelector(el));
-      frame = this._frameFor(el);
+      const generated = generateSelector(el);
+      target = this._buildTarget(el, generated);
+      fragile = generated.fragile;
     }
 
     const step = { type: 'pressKey', target, key: e.key };
     if (Object.keys(modifiers).length) step.options = { modifiers };
     if (fragile) step.fragile = true;
-    if (frame) step.frame = frame;
     this._pushStep(step);
   }
 
@@ -715,11 +741,9 @@ export class PagePilotRecorder {
 
     const step = { type: 'scroll', target: null, options };
     if (!isWindowLike) {
-      const { selector, fragile } = generateSelector(target);
-      step.target = selector;
-      if (fragile) step.fragile = true;
-      const frame = this._frameFor(target);
-      if (frame) step.frame = frame;
+      const generated = generateSelector(target);
+      step.target = this._buildTarget(target, generated);
+      if (generated.fragile) step.fragile = true;
     } else {
       // Scrolling the window of a same-origin iframe (not the top page)
       // still needs a frame marker so playback knows which window to scroll.
@@ -764,7 +788,7 @@ export class PagePilotRecorder {
     this._flushIfBlurred();
     this._flushTyping();
 
-    const { selector: sourceSelector, fragile: sourceFragile } = generateSelector(cand.el);
+    const sourceGenerated = generateSelector(cand.el);
     let destEl = null;
     try {
       destEl = doc.elementFromPoint(e.clientX, e.clientY);
@@ -772,18 +796,16 @@ export class PagePilotRecorder {
       destEl = null;
     }
 
-    const step = { type: 'dragTo', target: sourceSelector };
-    let fragile = sourceFragile;
+    const step = { type: 'dragTo', target: this._buildTarget(cand.el, sourceGenerated) };
+    let fragile = sourceGenerated.fragile;
     if (destEl && destEl !== cand.el && !cand.el.contains(destEl)) {
-      const { selector: destSelector, fragile: destFragile } = generateSelector(destEl);
-      step.destination = destSelector;
-      fragile = fragile || destFragile;
+      const destGenerated = generateSelector(destEl);
+      step.destination = this._buildTarget(destEl, destGenerated);
+      fragile = fragile || destGenerated.fragile;
     } else {
       step.destination = { x: e.clientX, y: e.clientY };
     }
     if (fragile) step.fragile = true;
-    const frame = this._frameFor(cand.el);
-    if (frame) step.frame = frame;
     this._pushStep(step);
     this._pendingTrigger = null; // a drag breaks any pending chooseOption merge
   }
