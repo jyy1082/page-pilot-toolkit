@@ -216,6 +216,24 @@ async function main() {
     await page.close();
   }
 
+  console.log('=== Run button refuses to click through a modal backdrop still covering the target ===');
+  {
+    const page = await freshPageWithPanel();
+    await page.evaluate(() => window.showModalBackdrop());
+    await page.locator('textarea').fill(JSON.stringify([
+      { type: 'click', target: '#covered-btn' },
+    ]));
+    await page.locator('#run-btn').click();
+    await page.waitForFunction(() => {
+      const status = document.querySelector('#page-pilot-toolkit-host');
+      return status; // just wait a beat for the run attempt to settle
+    });
+    await page.waitForTimeout(500);
+    const clicked = await page.evaluate(() => window.__coveredBtnClicked);
+    check('the covered button was NOT actually clicked — the panel refused to click through the modal', clicked === false);
+    await page.close();
+  }
+
   console.log('=== the panel itself is never recorded as part of a session ===');
   {
     const page = await freshPageWithPanel();

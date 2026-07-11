@@ -13,7 +13,7 @@
  * install.html's bookmarklet URL together when you want to ship an update.
  */
 
-const PAGE_PILOT_URL = 'https://cdn.jsdelivr.net/gh/jyy1082/page-pilot@0.15.0/page-pilot.js';
+const PAGE_PILOT_URL = 'https://cdn.jsdelivr.net/gh/jyy1082/page-pilot@0.16.0/page-pilot.js';
 const RECORDER_URL = 'https://cdn.jsdelivr.net/gh/jyy1082/page-pilot-recorder@0.5.0/page-pilot-recorder.js';
 
 if (window.__pagePilotToolkitActive) {
@@ -169,6 +169,11 @@ async function init() {
       // this needs to be automatic here even though it's opt-in in the
       // underlying library.
       autoWaitForIframeReload: true,
+      // Same reasoning: if an earlier step didn't actually close a modal,
+      // there's no way for someone running steps through this panel to
+      // notice and fix that mid-run — better to stop with a clear error
+      // than silently click through the backdrop to whatever's behind it.
+      verifyClickable: true,
     });
     try {
       await cursor.run(steps);

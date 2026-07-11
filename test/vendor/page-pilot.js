@@ -248,6 +248,7 @@ const DEFAULTS = {
   highlightColor: null, // defaults to opts.color if not set
   highlightDuration: null, // null/0 = persists until manually cleared; number (ms) = auto-fade
   autoWaitForIframeReload: false, // after each click, briefly watch for any same-origin iframe starting to reload, and if so wait for it to finish before continuing — see autoIframeReloadGrace/MaxWait
+  verifyClickable: false, // before clicking, confirm the target is actually the topmost element at its own position — catches clicking "through" a modal backdrop/overlay that a real mouse couldn't reach
   autoIframeReloadGrace: 400, // ms to watch for a reload starting before assuming nothing changed
   autoIframeReloadMaxWait: 4000, // ms to wait for a detected reload to actually finish
   onBeforeStep: null, // (step) => void
@@ -511,6 +512,50 @@ export class PagePilot {
   _center(el) {
     const rect = this._topLevelRect(el);
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }
+
+  /**
+   * Checks whether something else is visually on top of `el` at its own
+   * center point — the way a modal backdrop/overlay would sit over
+   * whatever's still open behind it. A real mouse click at that position
+   * would land on the topmost element, not `el` itself; this library
+   * dispatches events directly to a resolved element instead, which
+   * bypasses that entirely unless explicitly checked for (see
+   * opts.verifyClickable). Uses the element's own document/coordinate
+   * space, so this works correctly for elements inside a same-origin
+   * iframe too. Returns the obstructing element, or null if `el` (or an
+   * ancestor/descendant of it — covers clicking an icon inside a button,
+   * or a button that's itself inside a larger clickable card) is what's
+   * actually on top. Own overlay elements (cursor, ripple, highlights,
+   * glow, blocker, message) are skipped over — they're never a real
+   * obstruction, just this library's own visual layer.
+   */
+  _isObstructed(el) {
+    const doc = el.ownerDocument || document;
+    const rect = el.getBoundingClientRect(); // el's own document's coordinate space
+    if (rect.width === 0 && rect.height === 0) return null; // hidden entirely — _moveTo already warns about this separately
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    const ownOverlays = [this.cursorEl, this._glowEl, this._blockerEl, this._messageEl, ...this._highlights.values()]
+      .filter(Boolean);
+    const isOwnOverlay = (node) => ownOverlays.some((o) => o === node || (o.contains && o.contains(node)));
+
+    let stack;
+    try {
+      stack = typeof doc.elementsFromPoint === 'function'
+        ? doc.elementsFromPoint(cx, cy)
+        : [doc.elementFromPoint(cx, cy)];
+    } catch {
+      return null; // can't determine — don't block a click over an inconclusive check
+    }
+
+    for (const node of stack) {
+      if (!node || isOwnOverlay(node)) continue;
+      if (node === el || node.contains(el) || el.contains(node)) return null; // reached the target first — clickable
+      return node; // something unrelated is on top of it
+    }
+    return null;
   }
 
   _ripple(x, y) {
@@ -895,6 +940,17 @@ export class PagePilot {
 
   /** Shared click animation + execution, reused by click() and chooseOption(). */
   async _animatedClick(el) {
+    if (this.opts.verifyClickable) {
+      const blocker = this._isObstructed(el);
+      if (blocker) {
+        const desc = blocker.id ? `#${blocker.id}` : blocker.className ? `.${String(blocker.className).split(' ')[0]}` : blocker.tagName.toLowerCase();
+        throw new Error(
+          `PagePilot: target is covered by another element (${desc}) and a real mouse couldn't reach it — ` +
+          `possibly a modal/overlay that's still open. Set verifyClickable: false to click through it anyway, ` +
+          `or make sure whatever's covering it is actually closed first.`
+        );
+      }
+    }
     const { x, y } = await this._moveTo(el);
     const preClickRect = this._topLevelRect(el);
     this._ripple(x, y);

@@ -10,5 +10,16 @@
   <input id="password-field" type="password" />
   <button id="submit-btn">Submit</button>
   <iframe id="test-iframe" src="/test/iframe-fixture.html" style="width:300px; height:150px; border:1px solid #ccc;"></iframe>
+
+  <div style="position:relative; height:60px;">
+    <button id="covered-btn" style="position:absolute; left:10px; top:10px; width:100px; height:40px;">Behind modal</button>
+    <div id="modal-backdrop" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:500000; display:none;"></div>
+  </div>
+
+  <script>
+    window.showModalBackdrop = () => { document.getElementById('modal-backdrop').style.display = 'block'; };
+    window.__coveredBtnClicked = false;
+    document.getElementById('covered-btn').addEventListener('click', () => { window.__coveredBtnClicked = true; });
+  </script>
 </body>
 </html>

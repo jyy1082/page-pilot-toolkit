@@ -3,6 +3,25 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] — Modal/overlay obstruction detection
+
+### Changed
+- Pinned page-pilot version bumped to 0.16.0, and the Run button now
+  passes `verifyClickable: true` when creating its PagePilot instance.
+  Fixes the exact real-world risk: if a step in a recorded/pasted sequence
+  clicks through a modal dialog's backdrop that hadn't actually closed
+  (its own close button didn't work as expected, or something it was
+  waiting on never resolved), a real mouse could never reach whatever's
+  behind it — but this library, dispatching events straight to a resolved
+  element, silently could and would, interacting with the wrong thing with
+  no indication anything was wrong. With this on, such a click now throws
+  a clear error instead of going through. Bookmarklet users have no
+  realistic way to notice and fix this mid-run, so it needed to be
+  automatic here even though it's opt-in in the underlying library.
+- New real-browser test confirming the panel's own Run button (not just
+  the underlying library) correctly refuses to click a button still
+  covered by an open modal backdrop.
+
 ## [0.5.1]
 
 ### Changed

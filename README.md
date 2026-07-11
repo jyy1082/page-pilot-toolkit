@@ -2,7 +2,7 @@
 
 [中文](./README.zh-CN.md) · **English**
 
-**Version 0.5.1** · see [CHANGELOG.md](./CHANGELOG.md) for release history
+**Version 0.6.0** · see [CHANGELOG.md](./CHANGELOG.md) for release history
 
 A bookmarklet that drops a record/run panel onto whatever page you're
 currently on — no install, no browser extension, no build step. Drag one
@@ -43,6 +43,11 @@ or multi-step forms), the panel automatically waits for that reload to
 finish before continuing — no manual wait step needed, since there's no
 practical way to hand-edit a wait step into recorded or pasted JSON here.
 
+If an earlier step didn't actually close a modal dialog, the panel refuses
+to click through its backdrop to whatever's behind it — a real mouse could
+never do that either, so it stops with a clear error instead of silently
+interacting with the wrong thing.
+
 ## What it deliberately doesn't do
 
 - **Doesn't persist anything between visits.** Closing the tab (or the
@@ -74,7 +79,7 @@ practical way to hand-edit a wait step into recorded or pasted JSON here.
 ## Updating
 
 The bookmarklet's URL is pinned to a specific version
-(`page-pilot-toolkit@0.5.1`, and pinned versions of page-pilot /
+(`page-pilot-toolkit@0.6.0`, and pinned versions of page-pilot /
 page-pilot-recorder inside `toolkit.js` itself). An already-installed
 bookmark keeps working exactly the same way even after this repo changes —
 to pick up a new version, revisit the install page and drag the (updated)
