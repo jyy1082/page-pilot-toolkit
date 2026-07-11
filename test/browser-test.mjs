@@ -43,6 +43,10 @@ function startServer() {
           .replace(
             /const RECORDER_URL = .*;/,
             "const RECORDER_URL = '/vendor/page-pilot-recorder.js';"
+          )
+          .replace(
+            /const SKILLS_URL = .*;/,
+            "const SKILLS_URL = '/vendor/page-pilot-skills.js';"
           );
         res.writeHead(200, { 'Content-Type': 'text/javascript' });
         res.end(src);
@@ -124,6 +128,7 @@ async function main() {
     await page.keyboard.type('Jane Cooper');
     await page.locator('#submit-btn').click();
     await page.locator('#stop-btn').click();
+    await page.locator('text=One-time use').click(); // dismiss the archive panel — this test isn't about saving
 
     const stepsJson = await page.locator('textarea').inputValue();
     const steps = JSON.parse(stepsJson);
@@ -231,6 +236,93 @@ async function main() {
     await page.waitForTimeout(500);
     const clicked = await page.evaluate(() => window.__coveredBtnClicked);
     check('the covered button was NOT actually clicked — the panel refused to click through the modal', clicked === false);
+    await page.close();
+  }
+
+  console.log('=== SKILLS: stop -> save as skill -> appears in My Skills ===');
+  {
+    const page = await freshPageWithPanel();
+    await page.locator('#record-btn').click();
+    await page.locator('#name-input').click();
+    await page.keyboard.type('Jane Cooper');
+    await page.locator('#stop-btn').click();
+
+    // The archive panel should have detected "Full Name" as the suggested
+    // parameter name (from the <label for="name-input">) and pre-checked it.
+    await page.getByText('Full Name').first().waitFor();
+    await page.locator('#desc-input').fill('Fill in the name field');
+    await page.locator('#save-btn').click();
+
+    await page.getByText('Saved as a skill').first().waitFor();
+    await page.locator('#skills-section summary').click(); // expand "My Skills"
+    const skillVisible = await page.getByText('Fill in the name field').first().isVisible();
+    check('the saved skill appears in the My Skills list', skillVisible);
+    await page.close();
+  }
+
+  console.log('=== SKILLS: running a saved skill fills in NEW values, not the originally recorded ones ===');
+  {
+    const page = await freshPageWithPanel();
+    await page.locator('#record-btn').click();
+    await page.locator('#name-input').click();
+    await page.keyboard.type('Original Value');
+    await page.locator('#stop-btn').click();
+    await page.getByText('Full Name').first().waitFor();
+    await page.locator('#desc-input').fill('Type a name');
+    await page.locator('#save-btn').click();
+    await page.getByText('Saved as a skill').first().waitFor();
+
+    await page.fill('#name-input', ''); // reset the field before running the skill
+    await page.locator('#skills-section summary').click();
+    await page.locator('.run-skill-btn').first().click();
+    await page.locator('.param-form input[type="text"]').first().fill('A Brand New Value');
+    await page.locator('.confirm-run-btn').click();
+
+    await page.waitForFunction(() => document.getElementById('name-input').value === 'A Brand New Value', { timeout: 5000 });
+    check('running the saved skill with a new value types the NEW value, not "Original Value"', true);
+    await page.close();
+  }
+
+  console.log('=== SKILLS: deleting a skill removes it from the list ===');
+  {
+    const page = await freshPageWithPanel();
+    await page.locator('#record-btn').click();
+    await page.locator('#submit-btn').click();
+    await page.locator('#stop-btn').click();
+    await page.getByText('Save this as a reusable skill?').first().waitFor();
+    await page.locator('#desc-input').fill('Click submit');
+    await page.locator('#save-btn').click();
+    await page.getByText('Saved as a skill').first().waitFor();
+
+    await page.locator('#skills-section summary').click();
+    page.once('dialog', (d) => d.accept());
+    await page.locator('.delete-skill-btn').first().click();
+    await page.waitForTimeout(200);
+    const remainingSkillItems = await page.locator('.skill-item').count();
+    check('the skill is gone from the list after deleting', remainingSkillItems === 0);
+    await page.close();
+  }
+
+  console.log('=== SKILLS: a high-risk skill asks for confirmation before running ===');
+  {
+    const page = await freshPageWithPanel();
+    await page.locator('#record-btn').click();
+    await page.locator('#covered-btn').click(); // its id contains no risk word, but we'll force-check the box below
+    await page.locator('#stop-btn').click();
+    await page.getByText('Save this as a reusable skill?').first().waitFor();
+    await page.locator('#desc-input').fill('A risky action');
+    await page.locator('#high-risk-check').check(); // force it on for this test regardless of the heuristic
+    await page.locator('#save-btn').click();
+    await page.getByText('Saved as a skill').first().waitFor();
+
+    await page.locator('#skills-section summary').click();
+    await page.locator('.run-skill-btn').first().click();
+
+    let dialogMessage = null;
+    page.once('dialog', (d) => { dialogMessage = d.message(); d.dismiss(); }); // dismiss = "cancel", don't actually run it
+    await page.locator('.confirm-run-btn').click();
+    await page.waitForTimeout(200);
+    check('a confirmation dialog appears mentioning the high-risk skill', typeof dialogMessage === 'string' && dialogMessage.includes('high-risk'));
     await page.close();
   }
 

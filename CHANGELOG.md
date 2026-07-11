@@ -3,6 +3,32 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] — page-pilot-skills integration
+
+### Added
+- Stopping a recording now shows [page-pilot-skills](https://github.com/jyy1082/page-pilot-skills)'s
+  archive panel — save the recording as a reusable, named skill (turning
+  specific typed/selected values into named parameters) or use it just
+  this once. The JSON box always keeps the originally recorded values
+  either way, so Run/Copy on what you just recorded keep working
+  immediately regardless of whether it was also saved.
+- A **My Skills** section at the top of the panel lists everything saved
+  for the current site: **Run** opens a small form (one field per
+  parameter) to fill in new values and run the skill with them; skills
+  marked high-risk ask for an extra confirmation first; **Delete** removes
+  one for good, with a confirmation.
+- Pinned `page-pilot-skills` at 0.2.0.
+- 5 new real-browser tests: the full save → appears in My Skills flow,
+  running a saved skill with values different from what was originally
+  recorded, deleting a skill, and the high-risk confirmation dialog.
+
+### Documentation
+- Corrected an outdated claim that nothing persists between visits — the
+  JSON text box itself still doesn't, but saved skills now deliberately
+  do (as named parameters, via page-pilot-skills, never as raw example
+  values — see its own README for why). Added a security note about
+  skills living in the site's own `localStorage`.
+
 ## [0.6.1]
 
 ### Changed
