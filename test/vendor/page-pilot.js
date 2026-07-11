@@ -249,6 +249,7 @@ const DEFAULTS = {
   highlightDuration: null, // null/0 = persists until manually cleared; number (ms) = auto-fade
   autoWaitForIframeReload: false, // after each click, briefly watch for any same-origin iframe starting to reload, and if so wait for it to finish before continuing — see autoIframeReloadGrace/MaxWait
   verifyClickable: false, // before clicking, confirm the target is actually the topmost element at its own position — catches clicking "through" a modal backdrop/overlay that a real mouse couldn't reach
+  onObstruction: null, // async (blockingEl, targetEl) => boolean — called when verifyClickable finds something blocking the target; return true to retry the click, false/nothing to fall through to the normal error. Use plain DOM calls here (element.click()), not cursor.click() — calling back into the queue from inside a queued step deadlocks.
   autoIframeReloadGrace: 400, // ms to watch for a reload starting before assuming nothing changed
   autoIframeReloadMaxWait: 4000, // ms to wait for a detected reload to actually finish
   onBeforeStep: null, // (step) => void
@@ -941,7 +942,11 @@ export class PagePilot {
   /** Shared click animation + execution, reused by click() and chooseOption(). */
   async _animatedClick(el) {
     if (this.opts.verifyClickable) {
-      const blocker = this._isObstructed(el);
+      let blocker = this._isObstructed(el);
+      if (blocker && this.opts.onObstruction) {
+        const handled = await this.opts.onObstruction(blocker, el);
+        if (handled) blocker = this._isObstructed(el); // re-check once — the callback may have dismissed it
+      }
       if (blocker) {
         const desc = blocker.id ? `#${blocker.id}` : blocker.className ? `.${String(blocker.className).split(' ')[0]}` : blocker.tagName.toLowerCase();
         throw new Error(

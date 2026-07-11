@@ -3,6 +3,15 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.1]
+
+### Changed
+- Pinned page-pilot version bumped to 0.17.0, which adds an
+  `onObstruction` callback for library consumers writing their own scripts
+  (not directly usable from this panel's JSON-based UI, since there's no
+  way to provide a JS callback through it — the panel's Run button keeps
+  using the default error behavior when something is blocked).
+
 ## [0.6.0] — Modal/overlay obstruction detection
 
 ### Changed

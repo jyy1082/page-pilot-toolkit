@@ -2,7 +2,7 @@
 
 [中文](./README.zh-CN.md) · **English**
 
-**Version 0.6.0** · see [CHANGELOG.md](./CHANGELOG.md) for release history
+**Version 0.6.1** · see [CHANGELOG.md](./CHANGELOG.md) for release history
 
 A bookmarklet that drops a record/run panel onto whatever page you're
 currently on — no install, no browser extension, no build step. Drag one
@@ -79,7 +79,7 @@ interacting with the wrong thing.
 ## Updating
 
 The bookmarklet's URL is pinned to a specific version
-(`page-pilot-toolkit@0.6.0`, and pinned versions of page-pilot /
+(`page-pilot-toolkit@0.6.1`, and pinned versions of page-pilot /
 page-pilot-recorder inside `toolkit.js` itself). An already-installed
 bookmark keeps working exactly the same way even after this repo changes —
 to pick up a new version, revisit the install page and drag the (updated)
