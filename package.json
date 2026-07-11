@@ -1,6 +1,6 @@
 {
   "name": "page-pilot-toolkit",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A bookmarklet that drops a record/run panel onto any webpage, built on page-pilot (playback) and page-pilot-recorder (recording). No install, no extension — drag a bookmark, click it anywhere.",
   "private": true,
   "scripts": {

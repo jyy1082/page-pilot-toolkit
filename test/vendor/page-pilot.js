@@ -150,7 +150,30 @@ const DEFAULTS = {
   typeDelay: 45,
   respectReducedMotion: true,
   zIndex: 999999,
-  onExecuteClick: (el) => el.click(),
+  // el.click() alone only ever fires a 'click' event (plus the element's
+  // native activation behavior, like following a link or submitting a
+  // form) — it does NOT simulate mousedown/mouseup/pointerdown/pointerup at
+  // all. Plenty of real-world UI (dropdown menus, tab switches, admin
+  // dashboard frameworks) bind their actual behavior to mousedown instead
+  // of click for snappier interaction, and would silently never fire with
+  // just .click(). Dispatching the fuller sequence covers both cases;
+  // el.click() at the end still handles native activation behavior
+  // correctly (link navigation, form submission, checkbox toggling, etc.).
+  onExecuteClick: (el) => {
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const common = { bubbles: true, cancelable: true, clientX: cx, clientY: cy, view: window };
+    try {
+      el.dispatchEvent(new PointerEvent('pointerdown', { ...common, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
+    } catch { /* PointerEvent unsupported in this environment — mouse events below still cover it */ }
+    el.dispatchEvent(new MouseEvent('mousedown', common));
+    try {
+      el.dispatchEvent(new PointerEvent('pointerup', { ...common, pointerId: 1, pointerType: 'mouse', isPrimary: true }));
+    } catch { /* same as above */ }
+    el.dispatchEvent(new MouseEvent('mouseup', common));
+    el.click();
+  },
   onExecuteInput: (el, text) => {
     const editableAttr = el.getAttribute?.('contenteditable');
     const isEditable = el.isContentEditable || editableAttr === 'true' || editableAttr === '';

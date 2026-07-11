@@ -3,6 +3,17 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.1]
+
+### Changed
+- Pinned page-pilot version bumped to 0.15.0, which fixes the default
+  click behavior to dispatch a fuller mousedown/mouseup/click sequence
+  instead of just `el.click()` alone. Real-world admin dashboards and UI
+  frameworks (dropdown menus, tab switches — AceAdmin among them) often
+  bind their actual behavior to `mousedown` instead of `click`, and would
+  otherwise silently never respond even though the cursor animation played
+  correctly.
+
 ## [0.5.0] — Automatic iframe-reload handling
 
 ### Changed
