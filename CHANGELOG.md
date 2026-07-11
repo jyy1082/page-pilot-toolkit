@@ -3,6 +3,15 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.2]
+
+### Changed
+- Pinned page-pilot version bumped to 0.13.0, which adds
+  `waitForFrameReload()` — waits for a same-origin iframe's own content to
+  actually reload, fixing a race where the step right after a click that
+  triggers an iframe reload can otherwise run before that reload has even
+  started, hitting stale content.
+
 ## [0.4.1]
 
 ### Changed

@@ -1227,6 +1227,81 @@ export class PagePilot {
     });
   }
 
+  /**
+   * Wait for a same-origin iframe's own content to actually reload/navigate
+   * — its `contentDocument` gets replaced with a brand-new `Document`
+   * object once the new content is ready. More direct and reliable than
+   * `waitFor()`'ing some specific old element to disappear: it doesn't
+   * require knowing anything about the old page's structure at all, just
+   * that the iframe's document identity itself has changed. Solves the
+   * exact race where a step immediately following a click that triggers an
+   * iframe reload runs before that reload has actually happened, hitting a
+   * button in the STALE, about-to-be-replaced iframe content instead of
+   * the new one:
+   *
+   *   await cursor.click('#refresh-iframe-btn')   // wherever this button is
+   *   await cursor.waitForFrameReload('#my-iframe')
+   *   await cursor.click({ selector: '#new-btn', frame: '#my-iframe' })
+   *
+   * frameSelector: a selector for the <iframe> element itself, resolved in
+   *   the top-level document (nested iframes aren't supported by this
+   *   convenience method — use waitFor() with a { selector, frame } target
+   *   and a known element for that case).
+   * options.timeout: ms before giving up (default 5000)
+   * options.interval: ms between checks (default 100)
+   */
+  waitForFrameReload(frameSelector, options = {}) {
+    return this._enqueue(async () => {
+      const timeout = options.timeout ?? 5000;
+      const interval = options.interval ?? 100;
+      const step = { type: 'waitForFrameReload', target: frameSelector, label: options.label };
+      this.opts.onBeforeStep?.(step);
+
+      const getIframeDoc = () => {
+        let iframeEl;
+        try {
+          iframeEl = document.querySelector(frameSelector);
+        } catch {
+          return null;
+        }
+        if (!iframeEl) return null;
+        try {
+          return iframeEl.contentDocument;
+        } catch {
+          return null; // cross-origin — can't observe it at all
+        }
+      };
+
+      const originalDoc = getIframeDoc();
+      const start = performance.now();
+      await new Promise((resolve, reject) => {
+        let timer;
+        const abort = () => { clearTimeout(timer); reject(new PagePilotStopped()); };
+        this._pendingRejects.add(abort);
+        const tick = () => {
+          const currentDoc = getIframeDoc();
+          // A genuinely new document, and it's done loading (not still
+          // mid-navigation itself) — the reload is complete.
+          if (currentDoc && currentDoc !== originalDoc && currentDoc.readyState !== 'loading') {
+            this._pendingRejects.delete(abort);
+            resolve();
+            return;
+          }
+          if (performance.now() - start > timeout) {
+            this._pendingRejects.delete(abort);
+            reject(new Error(
+              `PagePilot: waitForFrameReload timed out after ${timeout}ms waiting for "${frameSelector}" to reload`
+            ));
+            return;
+          }
+          timer = setTimeout(tick, interval);
+        };
+        tick();
+      });
+      this.opts.onAfterStep?.(step);
+    });
+  }
+
   /** Run a fully custom step while still going through the queue/cursor. */
   step(target, action, label) {
     return this._enqueue(async () => {
@@ -1271,6 +1346,7 @@ export class PagePilot {
         else if (s.type === 'unhover') await this.unhover(s.label);
         else if (s.type === 'dragTo') await this.dragTo(withFrame(s.target, s.frame), withFrame(s.destination, s.frame), s.options || {});
         else if (s.type === 'waitFor') await this.waitFor(withFrame(s.target, s.frame), s.options || {});
+        else if (s.type === 'waitForFrameReload') await this.waitForFrameReload(s.target, s.options || {});
         else if (s.type === 'custom') await this.step(withFrame(s.target, s.frame), s.action, s.label);
       }
     } catch (err) {
