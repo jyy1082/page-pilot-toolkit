@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>toolkit iframe fixture 2</title>
+</head>
+<body>
+  <button id="new-iframe-btn">New iframe button</button>
+  <script>
+    window.__newIframeButtonClicked = false;
+    document.getElementById('new-iframe-btn').addEventListener('click', () => {
+      window.__newIframeButtonClicked = true;
+    });
+  </script>
+</body>
+</html>

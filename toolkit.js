@@ -13,7 +13,7 @@
  * install.html's bookmarklet URL together when you want to ship an update.
  */
 
-const PAGE_PILOT_URL = 'https://cdn.jsdelivr.net/gh/jyy1082/page-pilot@0.13.0/page-pilot.js';
+const PAGE_PILOT_URL = 'https://cdn.jsdelivr.net/gh/jyy1082/page-pilot@0.14.0/page-pilot.js';
 const RECORDER_URL = 'https://cdn.jsdelivr.net/gh/jyy1082/page-pilot-recorder@0.5.0/page-pilot-recorder.js';
 
 if (window.__pagePilotToolkitActive) {
@@ -161,7 +161,15 @@ async function init() {
     }
     runBtn.disabled = true;
     say('Running...');
-    const cursor = new PagePilot({ showPageGlow: true, pageGlowMessage: 'PagePilot is running \u2014 please wait...' });
+    const cursor = new PagePilot({
+      showPageGlow: true,
+      pageGlowMessage: 'PagePilot is running \u2014 please wait...',
+      // Bookmarklet users are running arbitrary recorded/pasted steps with
+      // no realistic way to hand-insert a waitForFrameReload() step, so
+      // this needs to be automatic here even though it's opt-in in the
+      // underlying library.
+      autoWaitForIframeReload: true,
+    });
     try {
       await cursor.run(steps);
       say('Done.');

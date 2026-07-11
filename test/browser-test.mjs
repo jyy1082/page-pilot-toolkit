@@ -193,6 +193,29 @@ async function main() {
     await page.close();
   }
 
+  console.log('=== Run button automatically handles an iframe reload with no manual wait step ===');
+  {
+    const page = await freshPageWithPanel();
+    const result = await page.evaluate(async () => {
+      const steps = [
+        { type: 'click', target: { selector: '#old-iframe-btn', frame: '#test-iframe' } },
+        { type: 'click', target: { selector: '#new-iframe-btn', frame: '#test-iframe' } },
+      ];
+      return steps;
+    });
+    await page.locator('textarea').fill(JSON.stringify(result));
+    await page.locator('#run-btn').click();
+    await page.waitForFunction(() => {
+      const iframe = document.getElementById('test-iframe');
+      return iframe.contentWindow && iframe.contentWindow.__newIframeButtonClicked === true;
+    }, { timeout: 5000 });
+    const clicked = await page.evaluate(() =>
+      document.getElementById('test-iframe').contentWindow.__newIframeButtonClicked === true
+    );
+    check('the panel\'s Run button waits for the iframe reload automatically and clicks the new button', clicked);
+    await page.close();
+  }
+
   console.log('=== the panel itself is never recorded as part of a session ===');
   {
     const page = await freshPageWithPanel();

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>toolkit iframe fixture</title>
+</head>
+<body>
+  <button id="old-iframe-btn">Old iframe button</button>
+  <script>
+    document.getElementById('old-iframe-btn').addEventListener('click', () => {
+      setTimeout(() => { window.location.href = '/test/iframe-fixture-2.html'; }, 200);
+    });
+  </script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 [中文](./README.zh-CN.md) · **English**
 
-**Version 0.4.2** · see [CHANGELOG.md](./CHANGELOG.md) for release history
+**Version 0.5.0** · see [CHANGELOG.md](./CHANGELOG.md) for release history
 
 A bookmarklet that drops a record/run panel onto whatever page you're
 currently on — no install, no browser extension, no build step. Drag one
@@ -38,6 +38,11 @@ page itself has nothing worth recording.)
 5. You can also paste a hand-written steps array into the box and press
    Run directly — recording isn't required.
 
+If a step reloads an iframe's content (common for embedded payment widgets
+or multi-step forms), the panel automatically waits for that reload to
+finish before continuing — no manual wait step needed, since there's no
+practical way to hand-edit a wait step into recorded or pasted JSON here.
+
 ## What it deliberately doesn't do
 
 - **Doesn't persist anything between visits.** Closing the tab (or the
@@ -69,7 +74,7 @@ page itself has nothing worth recording.)
 ## Updating
 
 The bookmarklet's URL is pinned to a specific version
-(`page-pilot-toolkit@0.4.2`, and pinned versions of page-pilot /
+(`page-pilot-toolkit@0.5.0`, and pinned versions of page-pilot /
 page-pilot-recorder inside `toolkit.js` itself). An already-installed
 bookmark keeps working exactly the same way even after this repo changes —
 to pick up a new version, revisit the install page and drag the (updated)

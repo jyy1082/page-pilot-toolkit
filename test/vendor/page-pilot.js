@@ -224,6 +224,9 @@ const DEFAULTS = {
   highlightEnabled: true,
   highlightColor: null, // defaults to opts.color if not set
   highlightDuration: null, // null/0 = persists until manually cleared; number (ms) = auto-fade
+  autoWaitForIframeReload: false, // after each click, briefly watch for any same-origin iframe starting to reload, and if so wait for it to finish before continuing — see autoIframeReloadGrace/MaxWait
+  autoIframeReloadGrace: 400, // ms to watch for a reload starting before assuming nothing changed
+  autoIframeReloadMaxWait: 4000, // ms to wait for a detected reload to actually finish
   onBeforeStep: null, // (step) => void
   onAfterStep: null, // (step) => void
 };
@@ -879,6 +882,7 @@ export class PagePilot {
     this.opts.onExecuteClick(el);
     this._highlight(el, preClickRect);
     await this._wait(this.opts.clickPause);
+    if (this.opts.autoWaitForIframeReload) await this._autoSettleIframes();
   }
 
   /** Animate a click on the target, then execute the real click. */
@@ -1300,6 +1304,68 @@ export class PagePilot {
       });
       this.opts.onAfterStep?.(step);
     });
+  }
+
+  /**
+   * Called automatically after every click when opts.autoWaitForIframeReload
+   * is on. Briefly watches every same-origin iframe on the page (not just
+   * one you'd have to name) for any of them starting to reload — whether
+   * the click that triggered it was inside that iframe or on the parent
+   * page — and if one does, waits for it to finish before the next step
+   * runs. If nothing looks like it's reloading within the grace window,
+   * returns immediately so unrelated clicks don't pay any extra latency.
+   * This is a best-effort safety net, not a hard guarantee: an iframe whose
+   * reload starts later than opts.autoIframeReloadGrace after the click
+   * won't be caught by it — use waitForFrameReload() explicitly for a step
+   * you know will always need it.
+   */
+  async _autoSettleIframes() {
+    const grace = this.opts.autoIframeReloadGrace;
+    const maxWait = this.opts.autoIframeReloadMaxWait;
+
+    const snapshot = () => {
+      let iframes;
+      try {
+        iframes = Array.from(document.querySelectorAll('iframe'));
+      } catch {
+        return [];
+      }
+      return iframes.map((el) => {
+        let doc = null;
+        try {
+          doc = el.contentDocument;
+        } catch {
+          doc = null; // cross-origin — nothing we can observe here
+        }
+        return { el, doc };
+      }).filter((f) => f.doc);
+    };
+
+    const before = snapshot();
+    const beforeDocs = new Map(before.map((f) => [f.el, f.doc]));
+
+    // Grace window: does any iframe look like it's started reloading?
+    const graceStart = performance.now();
+    let anyChanged = false;
+    while (performance.now() - graceStart < grace) {
+      const current = snapshot();
+      anyChanged = current.some((f) => f.doc !== beforeDocs.get(f.el) || f.doc.readyState === 'loading');
+      if (anyChanged) break;
+      await this._wait(50);
+    }
+    if (!anyChanged) return; // nothing reloading — don't add any extra delay
+
+    // Something is reloading — wait for every iframe to finish (bounded).
+    const settleStart = performance.now();
+    while (performance.now() - settleStart < maxWait) {
+      const current = snapshot();
+      const stillLoading = current.some((f) => f.doc.readyState === 'loading');
+      if (!stillLoading) return;
+      await this._wait(50);
+    }
+    // Gave it a fair chance; proceed rather than hang indefinitely if
+    // something is taking unusually long — the next step's own _resolve()
+    // will still throw a clear error if the target genuinely isn't there.
   }
 
   /** Run a fully custom step while still going through the queue/cursor. */

@@ -3,6 +3,23 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] — Automatic iframe-reload handling
+
+### Changed
+- Pinned page-pilot version bumped to 0.14.0, and the Run button now
+  passes `autoWaitForIframeReload: true` when creating its PagePilot
+  instance. Fixes the exact real-world race: clicking a button that
+  reloads an iframe's content (whether the button is inside the iframe or
+  on the parent page), then immediately clicking something in what should
+  be the new content — without this, the next step could run before the
+  iframe finished reloading and hit a stale, about-to-be-replaced button
+  instead. Bookmarklet users have no realistic way to hand-insert a wait
+  step into recorded/pasted JSON, so this needed to be automatic here even
+  though it's opt-in in the underlying library.
+- New real-browser test confirming the panel's own Run button (not just
+  the underlying library) correctly waits through an iframe reload with no
+  manual intervention.
+
 ## [0.4.2]
 
 ### Changed
